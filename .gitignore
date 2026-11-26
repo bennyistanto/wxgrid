@@ -218,3 +218,38 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- wxgrid ---
+# Session files, scratch, plans and research notes
+temp/
+.claude/
+CLAUDE.md
+HANDOFF.md
+
+# Data copies stay out of git: raw and compiled data live under F:/temp/station/,
+# and several sources do not allow redistribution.
+outputs/
+*.tif
+*.nc
+*.pkl
+*.csv.gz
+*.parquet
+*.xls
+*.xlsx
+*.zip
+*.mdb
+*.accdb
+*.nc4
+*.h5
+*.hdf
+data/
+# Exception: the draft rainfall release, copied to data/ by `wxgrid export` (job option mirror_dir)
+# !/data/*.csv.gz
+# Reference papers (copyright) stay local
+*.pdf
+
+# Windows, OneDrive and editors
+desktop.ini
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,526 @@
+# Consolidation config: BMKG workbooks, SACA&D, GHCN-Daily, ASEAN compendium; Indonesia and surroundings.
+# Everything dataset-specific lives here. Thresholds marked "provisional" are screening
+# choices to revisit with /qc and /critique, not claims about the climate.
+
+output_dir: F:/temp/station/compiled
+
+domain:
+  bbox: [90.0, -15.0, 145.0, 12.0]   # lon_min, lat_min, lon_max, lat_max
+
+sources:
+  - name: bmkg_xlsx
+    export_code: B
+    reader: bmkg_xlsx
+    path: F:/temp/station/bmkg_xlsx
+    network: BMKG
+    country: ID
+    missing_codes: [9999]             # workbook legend: "9999: Tidak Ada Data (tidak dilakukan pengukuran)"
+    unmeasurable_codes: [8888]        # legend: "8888: data tidak terukur"; kept as observed, flagged (user 2026-10-07)
+    unmeasurable_value: null          # no number assigned; set 0.0 to count 8888 rain as 0 mm
+    missing_codes_by_column: {ddd_x: [888]}   # findings F12: 3,341 values of 888 in ddd_x
+    day_convention: "24 h total observed at 07:00 local time (BMKG Data Online FAQ); date label = end of window [to verify]"
+    citation: "BMKG Data Online, https://dataonline.bmkg.go.id/"
+    variables: {Tn: TN, Tx: TX, Tavg: TG, RH_avg: HU, RR: RR, ss: SS, ff_x: FX, ddd_x: DX, ff_avg: FG, ddd_car: DD}
+    units: {Tn: degC, Tx: degC, Tavg: degC, RH_avg: "%", RR: mm, ss: h, ff_x: "m s-1", ddd_x: degree, ff_avg: "m s-1", ddd_car: degree}
+    direction_text: {ddd_car: true}   # compass letters, converted to degrees
+
+  - name: sacad_nonblend
+    export_code: S
+    reader: sacad_zip
+    kind: nonblend
+    path: F:/temp/station/sacad/SACA_nonblend_rr.zip
+    station_namespace: sacad
+    network: SACA&D
+    variable: RR
+    scale: 0.1                        # stored in 0.1 mm
+    units: mm
+    day_convention: "as delivered by each participant [to verify per source]"
+    citation: "van den Besselaar et al. 2015, BAMS, doi:10.1175/BAMS-D-13-00249.1"
+
+  - name: sacad_blend_synop
+    export_code: Y
+    reader: sacad_zip
+    kind: blend_synop
+    path: F:/temp/station/sacad/SACA_blend_rr.zip
+    station_namespace: sacad_synop      # each SYNOP source is its own station (review fix 1)
+    network: SACA&D (SYNOP)
+    variable: RR
+    scale: 0.1
+    units: mm
+    synop_parname: "Synop"            # SYNOP = participant name "Synoptical messages ..."
+    wmo_from_souid: true              # SOUID 99xxxx = 99 + WMO number (F41)
+    day_convention: "SYNOP-derived daily total [to verify: window]"
+    citation: "van den Besselaar et al. 2015, BAMS, doi:10.1175/BAMS-D-13-00249.1"
+
+  - name: sacad2013_extra
+    export_code: E
+    reader: sacad_zip
+    kind: blend_own
+    path: F:/temp/station/sacad_bigc/SACA_blend_rr.zip      # release built 21-03-2013 (user's \BIGC copy)
+    skip_stations_in: F:/temp/station/sacad/SACA_blend_rr.zip  # read only stations dropped from the 2022 release
+    own_coord_tol_deg: 0.02
+    station_namespace: sacad
+    network: SACA&D (2013 release)
+    variable: RR
+    scale: 0.1
+    units: mm
+    day_convention: "as delivered by each participant [to verify per source]"
+    citation: "van den Besselaar et al. 2015, BAMS, doi:10.1175/BAMS-D-13-00249.1"
+
+  - name: ghcnd
+    export_code: G
+    reader: ghcnd_dly
+    path: F:/temp/station/ghcnd/dly                  # 104 Indonesian stations downloaded 2026-10-06
+    stations_file: F:/temp/station/ghcnd/ghcnd-stations.txt
+    network: GHCN-Daily 3.35
+    elements: {PRCP: RR, TMAX: TX, TMIN: TN, TAVG: TG}
+    scale: {PRCP: 0.1, TMAX: 0.1, TMIN: 0.1, TAVG: 0.1}
+    units: {PRCP: mm, TMAX: degC, TMIN: degC, TAVG: degC}
+    day_convention:
+      S: "GSOD, derived from GTS synoptic reports [to verify: day window]"
+      I: "international collection [to verify: day window]"
+      default: "[to verify]"
+    citation: "Menne et al. 2012, J. Atmos. Oceanic Technol., doi:10.1175/JTECH-D-11-00103.1"
+
+  - name: asean_comp
+    export_code: A
+    reader: long_csv
+    path: F:/temp/station/asean-compendium/export   # from Daily.mdb via tools/export_mdb.ps1
+    network: "ASEAN Compendium of Climate Statistics family, daily Indonesia database (Daily.mdb) [to verify: edition and licence]"
+    citation: "Context: Teleti et al. 2026, SEA-HISTIN, EGUsphere, doi:10.5194/egusphere-2026-3459 (describes the 1976 monthly edition, not this database)"
+    country: ID
+    stations: {file: tbl_station_info.csv, id: Stn_ID, name: Stn_Name, lat: Lat_DD, lon: Long_DD, elev: Msl}
+    tables:
+      - file: tbl_Rainfall.csv
+        id: STN_ID
+        date: {year: YEAR, month: MONTH, day: DAY}
+        values: {Rainfall: RR}
+      - file: tbl_Temperature.csv
+        id: STN_ID
+        date: {year: YEAR, month: MONTH, day: DAY}
+        values: {MAXTEMP: TX, MINTEMP: TN, MEANTEMP: TG, RH: HU}
+    scale: {Rainfall: 0.1, MAXTEMP: 0.1, MINTEMP: 0.1, MEANTEMP: 0.1, RH: 1.0}   # tbl_Element Dec_Pt
+    units: {Rainfall: mm, MAXTEMP: degC, MINTEMP: degC, MEANTEMP: degC, RH: "%"}
+    missing_codes: [-999]         # per tbl_Element
+    unmeasurable_codes: [-333]    # undocumented; behaves like trace (QC 2026-10-07); kept like BMKG 8888 (user)
+    suspect_values: {Rainfall: [2000]}   # raw 2000 = 200.0 mm, code-like excess (QC); isolated ones excluded via qc
+    day_convention: "[to verify]"
+
+  - name: chind
+    reader: station_month_grid
+    path: F:/temp/station/additional-sources/DATA IKLIM/CH_IND.zip
+    export_code: C
+    network: BMKG national daily (CH_IND)
+    country: ID
+    station_namespace: chind
+    variable: RR
+    units: mm
+    year_pattern: '^(19|20)\d\d\.xls$'
+    id_col: ["NOMOR", "NO STA"]  # first present wins; spaces and dots ignored ("NOSTA", "No. Sta"); 1997 has both (F72)
+    name_col: STA
+    year_col: TAHUN
+    month_col: BULAN
+    day_prefix: R                # R1..R31
+    id_to_wmo_offset: 96000      # WMO = 96000 + NO STA (F49)
+    missing_codes: [9999]
+    unmeasurable_codes: [8888]   # "data tidak terukur" (same as the workbooks)
+    unmeasurable_text: [TU, TTU] # "Tidak Terukur", like 8888 (F60-F63); user decisions 2026-11-25
+    value_ceiling: 2000
+    day_convention: "BMKG daily; same network as the workbooks; corrected by the day-label step"
+    catalogue_csv: F:/temp/station/additional-sources/_wmo_catalogue.csv
+
+  - name: jatim
+    reader: jatim_grid
+    path: F:/temp/station/additional-sources/DATA CH JATIM
+    glob: '**/*.xls'
+    export_code: J
+    network: Dinas PU East Java rain posts
+    country: ID
+    station_namespace: jatim
+    variable: RR
+    units: mm
+    value_ceiling: 2000
+    drop_all_zero_sheets: true   # 107 complete year sheets of 0.0 at 6 posts = unfilled templates (/qc 2026-11-25, F64)
+    coordinates_override:   # F65; positions checked against the Desa/Kecamatan named in the sheets
+      19d_GALIS: {lat: -7.1602, lon: 113.5764, note: "sheets hold only 0/23 placeholders; position of 19b Galis (same Desa Galis, same basin Semajid; 19d ends 1990, 19b starts 1991) [to verify]"}
+      158_KETINTANG: {lat: -7.4441, lon: 112.6349, note: "OSM Nominatim position of Desa Jimbaran Wetan, Kec. Wonoayu, Sidoarjo, the desa named in the sheets (queried 2026-11-25); sheet value -7.42, 112.69 (2 decimals) is 6.6 km away; user 2026-11-25"}
+    day_convention: "daily rain post; morning read [to verify]; corrected by the day-label step"
+
+  - name: knmi
+    reader: knmi_sheets
+    export_code: K
+    path: F:/temp/station/knmi
+    stations_csv: F:/temp/station/knmi/_knmi_stations.csv   # tools/build_knmi_stations.py (F74)
+    network: "KNMI Dutch-era daily rainfall sheets (user's archive, 1879-1916)"
+    citation: "[to verify: published source of the KNMI sheets]"
+    country: ID
+    skip: [Jakarta, "Jakarta (BMG)"]   # same record as SACA&D 180 Kemayoran, which has 0.1 mm (F71)
+    coord_approx: [MEDAN_II]           # second Medan gauge, position of Medan assumed (F78, user 2026-11-26)
+    books:
+      - {path: "CH  sumatra.xls", layout: station_month_rows, sheets: [Harian, Harian2], blank: dry_if_month_reported}
+      - {path: "CH 1898-1907.xls", layout: station_month_rows, sheets: [Sheet1], blank: dry_if_month_reported}
+      - {path: "CH Jawa.xls", layout: station_month_rows, blank: missing}       # "-" = dry, blank = missing
+      - {path: "Sumatera 1880-1897.xls", layout: year_blocks, blank: dry_if_month_reported}
+    day_convention: "[to verify]; no reference before 1979, dates as written"
+
+  - name: pu_sihka
+    reader: pu_sihka
+    export_code: H
+    citation: "Ditjen SDA, Kementerian Pekerjaan Umum: SIHKA publications via https://pdsda.sda.pu.go.id (retrieved 2026-11-25)"
+    path: F:/temp/station/pu_sihka/raw                 # tools/fetch_pu_sihka.py, 2026-11-25 (F67)
+    decisions: F:/temp/station/pu_sihka/_decisions.csv  # tools/build_pu_sihka_decisions.py: R1-R3 (F68, user 2026-11-25)
+    network: "PU Ditjen SDA rain posts (SIHKA, pdsda.sda.pu.go.id)"
+    units: mm
+    max_elev_m: 4900                                   # R5: one header gives 5,840 m (F68 M3)
+    coordinates_override_csv: F:/temp/station/pu_sihka/_register_positions.csv  # PU register positions, 177 posts > 1 km off (tools/build_pu_register_overrides.py, F77, user 2026-11-26)
+    coordinates_override:  # /qc pu_sihka 2026-11-25 (tools/qc_pu_sihka_position_hypotheses.py), adopted by user 2026-11-26 (F76)
+      "06.13.07040090003": {lat: -2.81381, lon: 140.08747, note: "KAUREH - LEREH SP I (BWS Papua): longitude 104 -> 140; partners 26 km instead of 4,004 km, CPC r 0.083 -> 0.415"}
+      "06.13.05160380012": {lat: -4.31336, lon: 119.87111, note: "PESSE'E: longitude 116 -> 119; was 77.5 km at sea; partners 30 km instead of 334 km"}
+      "06.13.05150090002": {lat: -4.00014, lon: 119.72550, note: "PABBARESSENG: 2025 WKT header instead of Watang Gilireng's position; partners 11 km instead of 59 km, CPC r 0.312 -> 0.417"}
+    day_convention: "daily rain post; key 00:00 UTC; most posts match CPC one day earlier than the BMKG convention (F68 M4); corrected by the day-label step"
+
+  - name: fklim_sumatera
+    reader: long_table_xls
+    path: F:/temp/station/additional-sources/DATA IKLIM/CH_IND/Fklim_Sumatera.xls
+    export_code: F
+    network: BMKG F-KLIM Sumatera (daily, multi-variable)
+    country: ID
+    station_namespace: fklim
+    sheet: All
+    header_row: 3
+    id_col: Nosta
+    year_col: Year
+    month_col: Month
+    day_col: Date
+    value_map: {Rainfall: RR, Tx: TX, Tm: TN, Tavg: TG, Rhavg: HU, PPP: PP, Rh07: HU07, Rh13: HU13, Rh18: HU18}
+    missing_codes: [9999, 99999999]
+    missing_codes_by_station: {96163: [999]}   # Tabing writes 999 for missing in every column (1,114 rain cells; /qc 2026-11-25, F64)
+    unmeasurable_text: {Rainfall: [TTU]}   # "Tidak Terukur" = TU = 8888 (user 2026-11-25, F63); 64 cells at Tabing
+    day_convention: "BMKG daily; same network as the workbooks; corrected by the day-label step"
+    catalogue_csv: F:/temp/station/additional-sources/_wmo_catalogue.csv
+
+  - name: agro
+    reader: agro_collection
+    path: F:/temp/station/additional-sources/Data Stasiun
+    catalogue_csv: F:/temp/station/additional-sources/_agro_station_catalogue.csv
+    resolution_csv: F:/temp/station/additional-sources/_agro_sheet_resolution.csv
+    ledger_csv: F:/temp/station/additional-sources/_ledger_data_stasiun_final.csv
+    # station-years where a rainfall fingerprint picked one version (F56); other disagreements
+    # take the METKLIM per-year file (user decision 2026-10-08) and are flagged source_conflict
+    conflict_winners: {"Mojosari 1991": "METKLIM/175A-91.XLS", "Lampineung 1990": "LMPINENG/LPG88-94.XLS"}
+    export_code: D
+    network: BMKG agro-climate stations
+    country: ID
+    station_namespace: agro
+    day_convention: "daily agro-met station; morning read [to verify]; corrected by the day-label step"
+
+  # ---- phase 2 (2026-11-25): rain-post forms from the 2026-11-24 recheck (F56-F58) ----
+  # Cell coding measured in F57: "-" = dry day, 0 = rain day too small to measure (trace),
+  # X/R = no data; a whole month of "-" is flagged dash_month for /qc.
+  - name: bmg_posts
+    reader: post_forms
+    catalogue_csv: F:/temp/station/additional-sources/_post_catalogue.csv
+    catalogue_source: bmg_posts
+    codes: {dash_value: 0.0, zero_is_trace: true, missing_text: [X, R, RUSAK], unmeasurable_text: [TTU, TU]}
+    books:
+      - {post_key: Lelogama, layout: day_month, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/Lelogama_NTT.xls"}
+      - {post_key: Oesao, layout: day_month, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/Oesao_NTT.xls"}
+      - {post_key: Patas, layout: day_month, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/PATAS_Bali.xls"}
+      - {post_key: Pohsanten, layout: day_month, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/Pohsanten_Bali.xls"}
+      - {post_key: Praya, layout: day_month, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/PRAYA_NTB.xls"}
+      - {post_key: Batubassi, layout: day_month, glob: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/batubasih/19[789][0-9].[xX][lL][sS]"}
+      - {post_key: Batubassi, layout: year_month_rows, path: "F:/temp/station/additional-sources/DATA IKLIM/BMG/Data/batubasih/1994_2003.xls"}
+      # not read: PENINJAUAN_NTB.xls (no coordinates anywhere), Bajo_Sulsel.xls (stacked unnamed posts, F57)
+    variable: RR
+    units: mm
+    export_code: P
+    network: BMKG rain posts (BMG regional office forms)
+    country: ID
+    station_namespace: bmg_posts
+    day_convention: "BMKG rain post; morning read assumed; corrected by the day-label step"
+
+  - name: sumbar_daily
+    reader: post_forms
+    catalogue_csv: F:/temp/station/additional-sources/_post_catalogue.csv
+    catalogue_source: sumbar_daily
+    # 999 = missing (186,727 cells); 888 = unmeasurable by analogy with BMKG 8888 [to verify: no legend]
+    codes: {missing_codes: [999], unmeasurable_codes: [888]}
+    books:
+      - {post_key: "", layout: station_month_rows, path: "F:/temp/station/additional-sources/DATA IKLIM/CH_IND/d_rainfall_west_sumatera.xls"}
+    variable: RR
+    units: mm
+    export_code: W
+    network: West Sumatra rain posts (BMG compilation 1991-2000)
+    country: ID
+    station_namespace: sumbar_daily
+    day_convention: "BMKG rain post; morning read assumed; corrected by the day-label step"
+
+  - name: larantuka
+    reader: post_forms
+    catalogue_csv: F:/temp/station/additional-sources/_post_catalogue.csv
+    catalogue_source: ntt_larantuka
+    books:
+      - {post_key: Larantuka, layout: agro_sheets, path: "F:/temp/station/additional-sources/DATA IKLIM/_NTT/Larantuka(85-96)(harian).XLS"}
+    export_code: L
+    network: NTT climate station (agro form)
+    country: ID
+    station_namespace: larantuka
+    day_convention: "daily climate station; morning read assumed; corrected by the day-label step"
+
+  - name: sumsel_posts
+    reader: post_forms
+    catalogue_csv: F:/temp/station/additional-sources/_post_catalogue.csv
+    catalogue_source: sumsel_posts
+    # whole months of "-" are unreported here (CPC median 163 mm in them, F59): dropped
+    codes: {dash_value: 0.0, zero_is_trace: true, missing_text: [X, R], dash_month: missing}
+    books:
+      - {post_prefix: "Banyuasin|", layout: post_rows, path: "F:/temp/station/additional-sources/CH Sumsel/BANYUASIN/BANYUASIN_nopassword.xlsx"}
+      - {post_prefix: "Muba|", layout: post_rows, path: "F:/temp/station/additional-sources/CH Sumsel/MUBA/Muba_nopassword.xlsx"}
+      - {post_prefix: "OKI|", layout: post_rows, path: "F:/temp/station/additional-sources/CH Sumsel/OKI/OKI_nopassword.xlsx"}
+    variable: RR
+    units: mm
+    export_code: M
+    network: South Sumatra district rain posts (Dinas Pertanian compilations)
+    country: ID
+    station_namespace: sumsel_posts
+    day_convention: "rain post; morning read assumed; corrected by the day-label step"
+# Provisional plausibility bounds per variable: values outside are flagged, never removed.
+flag_bounds:
+  EV: [0, 50]
+  RA: [0, 1200]
+  PP: [700, 1100]
+  HU07: [0, 100]
+  HU13: [0, 100]
+  HU18: [0, 100]
+  HUX: [0, 100]
+  HUN: [0, 100]
+  SSP: [0, 100]
+  RR: [0, 500]
+  TN: [-5, 40]
+  TX: [0, 45]
+  TG: [-5, 42]
+  HU: [0, 100]
+  SS: [0, 13]
+  FX: [0, 60]
+  FG: [0, 40]
+  DX: [0, 360]
+  DD: [0, 360]
+
+crosswalk:
+  check_variable: RR
+  max_km: 10.0
+  same_site_km: 1.0
+  name_match_km: 5.0
+  name_sim_min: 85             # provisional
+  min_overlap_days: 365
+  duplicate_equal_frac: 0.9    # provisional
+  r_min: 0.8                   # provisional
+  provider_groups:             # a source in a group joins only sources of the same group (user 2026-11-25:
+    PU: [pu_sihka, jatim]      # PU owns its network and sites, usually at PU field offices: never joined with BMKG)
+  neutral_sources: [asean_comp] # joins PU or BMKG stations, but a site never holds both (user 2026-11-25): 95 joins with BMKG, 22 exact copies
+  isolated_sources: [knmi]      # Dutch-era gauges (1879-1916) stay their own sites: every join to a modern station rested on position alone, no common days (F79, user 2026-11-26)
+  equal_tol: 0.05              # mm
+  lags: [-1, 0, 1]
+  drop_words: [STASIUN, METEOROLOGI, KLIMATOLOGI, GEOFISIKA, MARITIM, POS, PENGAMATAN,
+               BALAI, BESAR, STAMET, STAKLIM, STAGEOF, AIRPORT, BANDARA, AWS, ARG]
+
+  overrides:   # user decisions from the 2026-10-06 review of needs_review pairs
+    join:
+      - [bmkg_xlsx:96073, sacad:7]   # Stasiun Meteorologi FL Tobing / STASIUN METEOROLOGI F. L TOBING
+      - [bmkg_xlsx:96145, sacad:2826]   # Stasiun Meteorologi Tarempa / TAREMPA
+      - [bmkg_xlsx:96147, sacad:13]   # Stasiun Meteorologi Ranai / STASIUN METEOROLOGI RANAI
+      - [bmkg_xlsx:96171, sacad:15]   # Stasiun Meteorologi Japura / STASIUN METEOROLOGI JAPURA
+      - [bmkg_xlsx:96179, sacad:16]   # Stasiun Meteorologi Dabo / STASIUN METEOROLOGI DABO SINGKEP
+      - [bmkg_xlsx:96195, sacad:17]   # Stasiun Meteorologi Sultan Thaha / STASIUN METEOROLOGI SULTAN THAHA
+      - [bmkg_xlsx:96207, sacad:18]   # Stasiun Meteorologi Depati Parbo / STASIUN METEOROLOGI DEPATI PARBO
+      - [bmkg_xlsx:96295, sacad:23]   # Stasiun Meteorologi Radin Inten II / STASIUN METEOROLOGI RADEN INTEN II
+      - [bmkg_xlsx:96509, sacad:27]   # Stasiun Meteorologi Juwata / STASIUN METEOROLOGI JUWATA
+      - [bmkg_xlsx:96535, sacad:30]   # Stasiun Meteorologi Paloh / STASIUN METEOROLOGI PALOH
+      - [bmkg_xlsx:96585, sacad:100]   # Stasiun Meteorologi Maritim Pontianak / STASIUN METEOROLOGI MARITIM PONTIANAK
+      - [bmkg_xlsx:96615, sacad:37]   # Stasiun Meteorologi Rahadi Oesman / STASIUN METEOROLOGI RAHADI OESMAN
+      - [bmkg_xlsx:96633, sacad:38]   # Stasiun Meteorologi Sultan Aji Muhammad Sulaiman Sepinggan / STASIUN METEOROLOGI SULTAN AJI MUHAMMAD
+      - [bmkg_xlsx:96685, sacad:43]   # Stasiun Meteorologi Syamsudin Noor / STASIUN METEOROLOGI SYAMSUDIN NOOR
+      - [bmkg_xlsx:96739, sacad:45]   # Stasiun Meteorologi Budiarto / STASIUN METEOROLOGI BUDIARTO
+      - [bmkg_xlsx:96741, sacad:101]   # Stasiun Meteorologi Maritim Tanjung Priok / STASIUN METEOROLOGI MARITIM TANJUNG PRI
+      - [bmkg_xlsx:96747, sacad:169]   # Halim Perdana Kusuma Jakarta / HALIM PERDANA KUSUMA
+      - [bmkg_xlsx:96749, sacad:46]   # Stasiun Meteorologi Soekarno Hatta / STASIUN METEOROLOGI SOEKARNO HATTA
+      - [bmkg_xlsx:96751, sacad:112]   # Stasiun Meteorologi Citeko / STASIUN METEOROLOGI CITEKO
+      - [bmkg_xlsx:96791, sacad:109]   # Stasiun Meteorologi Kertajati / STASIUN METEOROLOGI JATIWANGI
+      - [bmkg_xlsx:96797, sacad:110]   # Stasiun Meteorologi Tegal / STASIUN METEOROLOGI TEGAL
+      - [bmkg_xlsx:96805, sacad:111]   # Stasiun Meteorologi Tunggul Wulung / STASIUN METEOROLOGI CILACAP
+      - [bmkg_xlsx:96835, sacad:133]   # Stasiun Klimatologi Semarang / STASIUN KLIMATOLOGI SEMARANG
+      - [bmkg_xlsx:96935, sacad:48]   # Stasiun Meteorologi Juanda / STASIUN METEOROLOGI JUANDA
+      - [bmkg_xlsx:96937, sacad:103]   # Stasiun Meteorologi Maritim Tanjung Perak / STASIUN METEOROLOGI MARITIM PERAK II
+      - [bmkg_xlsx:96987, sacad:116]   # Stasiun Meteorologi Banyuwangi / STASIUN METEOROLOGI BANYUWANGI
+      - [bmkg_xlsx:97008, sacad:49]   # Stasiun Meteorologi Naha / STASIUN METEOROLOGI NAHA
+      - [bmkg_xlsx:97028, sacad:51]   # Stasiun Meteorologi Sultan Bantilan / STASIUN METEOROLOGI SULTAN BANTILAN
+      - [bmkg_xlsx:97048, sacad:52]   # Stasiun Meteorologi Djalaluddin / STASIUN METEOROLOGI DJALALUDDIN
+      - [bmkg_xlsx:97072, sacad:53]   # Stasiun Meteorologi Mutiara Sis-Al Jufri / STASIUN METEOROLOGI MUTIARA SIS-AL JUFR
+      - [bmkg_xlsx:97144, sacad:105]   # Stasiun Meteorologi Maritim Kendari / STASIUN METEOROLOGI MARITIM KENDARI
+      - [bmkg_xlsx:97182, sacad:106]   # Stasiun Meteorologi Maritim Paotere / STASIUN METEOROLOGI MARITIM PAOTERE
+      - [bmkg_xlsx:97192, sacad:59]   # Stasiun Meteorologi Beto Ambari / STASIUN METEOROLOGI BETO AMBARI
+      - [bmkg_xlsx:97230, sacad:60]   # Stasiun Meteorologi I Gusti Ngurah Rai / STASIUN METEOROLOGI NGURAH RAI
+      - [bmkg_xlsx:97310, sacad:67]   # Stasiun Meteorologi Gewayantana / STASIUN METEOROLOGI GEWAYANTANA
+      - [bmkg_xlsx:97340, sacad:69]   # Stasiun Meteorologi Umbu Mehang Kunda / STASIUN METEOROLOGI UMBU MEHANG KUDA
+      - [bmkg_xlsx:97372, sacad:70]   # Stasiun Meteorologi Eltari / STASIUN METEOROLOGI ELTARI
+      - [bmkg_xlsx:97430, sacad:74]   # Stasiun Meteorologi Sultan Babullah / STASIUN METEOROLOGI SULTAN BAABULLAH
+      - [bmkg_xlsx:97502, sacad:76]   # Stasiun Meteorologi Domine Eduard Osok / STASIUN METEOROLOGI SEIGUN
+      - [bmkg_xlsx:97530, sacad:77]   # Stasiun Meteorologi Rendani / STASIUN METEOROLOGI RENDANI
+      - [bmkg_xlsx:97560, sacad:78]   # Stasiun Meteorologi Frans Kaisiepo / STASIUN METEOROLOGI FRANS KAISIEPO
+      - [bmkg_xlsx:97600, sacad:81]   # Stasiun Meteorologi Emalamo / STASIUN METEOROLOGI EMALAMO
+      - [bmkg_xlsx:97682, sacad:83]   # Stasiun Meteorologi Moanamani / STASIUN METEOROLOGI MOANAMANI
+      - [bmkg_xlsx:97690, sacad:85]   # Stasiun Meteorologi Sentani / STASIUN METEOROLOGI SENTANI
+      - [bmkg_xlsx:97724, sacad:88]   # Stasiun Meteorologi Pattimura / STASIUN METEOROLOGI PATTIMURA
+      - [bmkg_xlsx:97810, sacad:93]   # Stasiun Meteorologi Karel Sadsuitubun / STASIUN METEOROLOGI DUMATUBUN TUAL
+      - [bmkg_xlsx:97876, sacad:2942]   # Stasiun Meteorologi Tanah Merah / TANAH MERAH 2
+      - [bmkg_xlsx:97900, sacad:95]   # Stasiun Meteorologi Mathilda Batlayeri / STASIUN METEOROLOGI MATHILDA BALTAYERI
+      - [bmkg_xlsx:97980, sacad:96]   # Stasiun Meteorologi Mopah / STASIUN METEOROLOGI MOPAH
+      - [bmkg_xlsx:96163, ghcnd:ID000096163]   # same WMO, stale GHCN coordinates (F26): PADANG/TABING / Minangkabau
+      - [bmkg_xlsx:97502, ghcnd:ID000097502]   # same WMO, stale GHCN coordinates (F26): SORONG/JEFMAN / Domine Eduard Osok
+      - [bmkg_xlsx:96015, ghcnd:IDM00096015]   # same WMO, stale GHCN coordinates (F26): MEULABOH/CUT NYAK / Cut Nyak Dhien Nagan Raya
+      - [bmkg_xlsx:96207, ghcnd:IDM00096207]   # same WMO, stale GHCN coordinates (F26): KERINCI/DEPATI PARB / Depati Parbo
+      - [bmkg_xlsx:96295, ghcnd:IDM00096295]   # same WMO, stale GHCN coordinates (F26): RADIN INTEN II / Radin Inten II
+      - [bmkg_xlsx:96525, ghcnd:IDM00096525]   # same WMO, stale GHCN coordinates (F26): TANJUNG SELOR / Tanjung Harapan
+      - [bmkg_xlsx:96595, ghcnd:IDM00096595]   # same WMO, stale GHCN coordinates (F26): MUARATEWE/BERINGIN / Beringin
+      - [bmkg_xlsx:96695, ghcnd:IDM00096695]   # same WMO, stale GHCN coordinates (F26): KOTABARU/SETAGEN / Gusti Syamsir Alam
+      - [bmkg_xlsx:96937, ghcnd:IDM00096937]   # same WMO, stale GHCN coordinates (F26): SURABAYA/GEDANGAN / Maritim Tanjung Perak
+      - [bmkg_xlsx:97028, ghcnd:IDM00097028]   # same WMO, stale GHCN coordinates (F26): TOLI-TOLI/LALOS / Sultan Bantilan
+      - [bmkg_xlsx:97120, ghcnd:IDM00097120]   # same WMO, stale GHCN coordinates (F26): MAJENE / Majene
+      - [bmkg_xlsx:97182, ghcnd:IDM00097182]   # same WMO, stale GHCN coordinates (F26): UJANG PANDANG/PAOTERE / Maritim Paotere
+      - [bmkg_xlsx:97460, ghcnd:IDM00097460]   # same WMO, stale GHCN coordinates (F26): LABUHA/TALIABU / Oesman Sadik
+      - [bmkg_xlsx:97698, ghcnd:IDM00097698]   # same WMO, stale GHCN coordinates (F26): JAYAPURA/DOK II / Dok II Jayapura
+      - [bmkg_xlsx:97748, ghcnd:IDM00097748]   # same WMO, stale GHCN coordinates (F26): GESER / Geser
+      - [bmkg_xlsx:97796, ghcnd:IDM00097796]   # same WMO, stale GHCN coordinates (F26): KOKONAO/TIMUKA / Mozez Kilangin
+      - [bmkg_xlsx:97180, sacad:2982]   # last-9 review: Sultan Hasanuddin / UJUNG PANDANG (old name)
+      - [sacad:115, ghcnd:IDM00096973]   # last-9 review: KALIANGET / KALIANGET (MADURA IS)
+      - [bmkg_xlsx:96747, "asean_comp:5630690"]   # compendium review: Halim
+      - [bmkg_xlsx:96179, "asean_comp:5050460"]   # compendium review: Dabo
+      - [bmkg_xlsx:96073, "asean_comp:0169890"]   # compendium review: FL Tobing / Pinang Sori-Sibolga
+      - [bmkg_xlsx:97748, "asean_comp:5393090"]   # compendium review: Geser / Geser(B)
+      - [bmkg_xlsx:96509, "asean_comp:0331760"]   # compendium review: Juwata / Tarakan
+      - [bmkg_xlsx:96745, "asean_comp:5620680"]   # corrected: workbook 96745 = Jakarta Observatorium data (6,063 d, r 0.96, 91% equal)
+      - [bmkg_xlsx:96253, "asean_comp:5390230"]   # Fatmawati = Padang Kemiling Bengkulu data (r 0.93, 97% equal)
+      - [bmkg_xlsx:97900, "asean_comp:5803130"]   # compendium review: Mathilda Batlayeri / Saumlaki
+      - [sacad:171, "asean_comp:5861510"]   # compendium review: Tabanan
+      - [sacad:4928, "asean_comp:5741270"]   # compendium review: Sruni
+      - [sacad:2963, "asean_comp:5761150"]   # compendium review: Madiun 1 / Iswahyudi Madiun
+      - [sacad:2967, "asean_comp:5811432"]   # compendium review: Sumberejo
+      - [sacad:2958, "asean_comp:5750860"]   # compendium review: Tasikmalaya
+      - [sacad:2983, "asean_comp:5521950"]   # compendium review: Panakukang
+      - [sacad:3434, "asean_comp:5630760"]   # compendium review: Cilamaya
+      - [sacad:2972, "asean_comp:0040140"]   # compendium review: Pakanbaru / Simpangtiga
+      - [ghcnd:ID000097724, "asean_comp:5372810"]   # compendium review: Ambon
+      - [ghcnd:IDM00096035, "asean_comp:0369870"]   # compendium review: Polonia-Medan
+      - [ghcnd:IDM00096933, "asean_comp:5721280"]   # compendium review: Surabaya-Perak
+      - [bmkg_xlsx:96749, "asean_comp:5610670"]   # Soekarno Hatta / Cengkareng (airport is in Cengkareng; r 0.80 after day-label fix)
+      - [bmkg_xlsx:96221, "asean_comp:5290470"]   # Sultan Mahmud Badaruddin II / Talang Betutu Palembang (airport)
+      - [sacad:115, "asean_comp:5711400"]   # Kalianget / Kalianget (compendium)
+      - ["bmkg_xlsx:96739", "sacad_synop:996739"]   # 2026-10-07 review: Budiarto / Curug SYNOP, same WMO, stale coords
+      - ["bmkg_xlsx:97008", "sacad_synop:997008"]   # 2026-10-07 review: Naha / Naha-Tahuna SYNOP, same WMO, stale coords
+      - ["bmkg_xlsx:96295", "sacad_synop:996295"]   # 2026-10-07 review: Radin Inten II / SYNOP, same WMO, stale coords
+      - ["bmkg_xlsx:97086", "sacad_synop:997086"]   # 2026-10-07 review: Syukuran Aminudin Amir / Luwuk-Bubung SYNOP, same WMO, stale coords
+      - ["bmkg_xlsx:96925", "asean_comp:5591260"]   # 2026-10-07 review: Sangkapura / Sangkapura-Bawean (88% identical)
+      - ["sacad_synop:996739", "asean_comp:5620670"]   # 2026-10-07 review: Curug-Budiarto SYNOP / Curug Tangerang
+      - ["sacad_synop:996615", "asean_comp:5191000"]   # 2026-10-07 review: Ketapang-Rahadi Usman SYNOP / Ketapang
+      - ["bmkg_xlsx:96595", "sacad:35"]   # 2026-10-07 review: Beringin / Beringin (user: join)
+    separate:
+      - ["asean_comp:5090040", "agro:BANDARBUAT"]   # user 2026-10-07: keep separate (was misfiled under join until 2026-10-08): Bandarbuat farm vs Tabing/Padang airport, coords coincide
+      - ["asean_comp:5650750", "agro:MARGAHAYU"]   # user 2026-10-07: keep separate (was misfiled under join until 2026-10-08): same name, daily values disagree (r 0.12)
+      - ["asean_comp:5700840", "agro:KUNINGAN"]   # user 2026-10-07: keep separate (was misfiled under join until 2026-10-08): weak match, day-label offset
+      - [bmkg_xlsx:96783, sacad:153]   # Stasiun Geofisika Bandung / HUSEIN - BANDUNG
+      - [bmkg_xlsx:96839, sacad:133]   # Stasiun Meteorologi Ahmad Yani / STASIUN KLIMATOLOGI SEMARANG
+      - [bmkg_xlsx:97146, ghcnd:ID000097146]   # same WMO 97146 but 26 km apart, nothing to test (F26)
+      - [bmkg_xlsx:96933, sacad:103]   # Stasiun Meteorologi Perak I / STASIUN METEOROLOGI MARITIM PERAK II
+      - [bmkg_xlsx:97012, sacad:50]   # Stasiun Klimatologi Minahasa Utara / STASIUN METEOROLOGI SAM RATULANGI
+      - [bmkg_xlsx:97014, sacad:135]   # Stasiun Meteorologi Sam Ratulangi / STASIUN KLIMATOLOGI MINAHASA UTARA
+      - [bmkg_xlsx:97146, sacad:105]   # Stasiun Geofisika Kendari / STASIUN METEOROLOGI MARITIM KENDARI
+      - [bmkg_xlsx:97692, sacad:2937]   # last-9 review: Jayapura Klimatologi / GENJEM
+      - [bmkg_xlsx:97374, ghcnd:ID000097372]   # last-9 review: Kupang Klimatologi / GHCN Eltari
+      - [bmkg_xlsx:96835, ghcnd:IDM00096837]   # last-9 review: Semarang Klimatologi / GHCN Tanjung Emas
+      - [sacad:133, ghcnd:IDM00096837]   # last-9 review: SACA Semarang / GHCN Tanjung Emas
+      - [bmkg_xlsx:97180, ghcnd:IDM00097182]   # last-9 review: Hasanuddin / GHCN Paotere (stale coords)
+      - [sacad:2982, ghcnd:IDM00097180]   # last-9 review: Ujung Pandang / GHCN Hasanuddin
+      - [sacad:2982, ghcnd:IDM00097182]   # last-9 review: Ujung Pandang / GHCN Paotere (stale coords)
+      - [bmkg_xlsx:96635, "asean_comp:5131690"]   # compendium review: Geofisika Balikpapan / Balikpapan
+      - [bmkg_xlsx:97374, "asean_comp:6022370"]   # compendium review: Kupang Klimatologi / Kupang
+      - [bmkg_xlsx:96835, "asean_comp:5701040"]   # compendium review: Semarang Klimatologi / Semarang Ahmad Yani
+      - [sacad:133, "asean_comp:5701040"]   # compendium review: Semarang Klimatologi / Semarang Ahmad Yani
+      - [sacad:153, "asean_comp:5690761"]   # compendium review: Husein-Bandung / Geofisika Bandung
+      - [sacad:2993, "asean_comp:5630760"]   # compendium review: Cileduk / Cilamaya
+      - [sacad:2972, "asean_comp:0050150"]   # compendium review: Pakanbaru / Pekanbaru town
+      - [ghcnd:IDM00096195, "asean_comp:5160370"]   # compendium review: Sultan Thaha / Palmerah Jambi
+      - [bmkg_xlsx:96745, "asean_comp:5620690"]   # corrected: compendium Kemayoran matches 96745 only at lag -1, r 0.62
+      - [bmkg_xlsx:96255, "asean_comp:5390230"]   # Padang Kemiling belongs with Fatmawati, not Bengkulu Klimatologi
+      - [sacad:3081, "asean_comp:5700920"]   # Karangjati already joined with sacad 3080 on passing data
+      - [sacad:2962, "asean_comp:5741270"]   # Sruni already joined with sacad 4928
+      - [sacad:180, "asean_comp:5620690"]   # SACA Kemayoran sits with 96745/Observatorium; compendium Kemayoran apart (best lag -1)
+      - [bmkg_xlsx:97146, "sacad_synop:997146"]   # Kendari airport SYNOP stays with the airport (as GHCN 97146), not Geofisika Kendari
+      - ["bmkg_xlsx:96695", "sacad:44"]   # 2026-10-07 review: Gusti Syamsir Alam: unrelated data (r -0.01)
+      - ["sacad_synop:996195", "asean_comp:5160370"]   # 2026-10-07 review: Sultan Thaha SYNOP / Palmerah Jambi: unrelated data (r 0.01)
+      - ["bmkg_xlsx:96165", "sumbar_daily:|PU_Padang_Panjang"]   # user 2026-11-25: keep separate: 4.1 km, best lag +1, 7% equal days
+      - ["fklim:96165", "sumbar_daily:|PU_Padang_Panjang"]   # user 2026-11-25: keep separate: 4.1 km, 4% equal days
+      - ["agro:BANDARBUAT", "sumbar_daily:43F|Bandar_Buat"]   # user 2026-11-25: keep separate: 2.3 km, r 0.69, 66% equal days
+      - ["sacad:153", "agro:BANDUNG"]   # user 2026-11-25: keep separate: agro Bandung = Geofisika 96783 (r 0.76, 93% equal); Husein vs it r 0.47, 42% equal
+      - ["jatim:175_MOJOSARI", "agro:MOJOSARI"]   # user 2026-11-25: keep separate: r 0.23 lag 0 / 0.28 lag +1, no better than vs Pudaksari; 155 m elevation difference
+      - ["bmkg_xlsx:97052", "pu_sihka:06.13.05040600008"]   # user 2026-11-25: keep separate: 4.3 km, r 0.73 but 10% equal wet days, ratio 0.88 (tools/check_review_pairs_sihka.py)
+      - ["asean_comp:5791130", "pu_sihka:06.13.02180340039"]   # user 2026-11-25: keep separate: Purwantoro 1.6 km, r 0.55, 13% equal wet days; joining would splice two gauges
+      - ["chind:97146", "sacad_synop:997146"]   # user 2026-11-25: keep separate: same WMO, 26 km; CH_IND 97146 is a Kendari town record (r 0.01 vs airport SYNOP; r 0.83, 71% equal vs SACA&D 105), tools/check_wmo_97146.py
+      - ["chind:97146", "ghcnd:ID000097146"]    # user 2026-11-25: keep separate: as above
+
+# Day-label correction (user 2026-10-06: rainfall only; target = BMKG official convention).
+daylabel:
+  variables: [RR]
+  countries: [ID]         # target lags calibrated on Indonesian data only; AU etc. left unverified (F39)
+  target: "24 h ending 07:00 local, labelled with the end date (BMKG Data Online FAQ)"
+  lags: [-2, -1, 0, 1]
+  window_days: 120        # provisional
+  step_days: 30
+  min_pairs: 60
+  min_margin: 0.1         # provisional; F19 median margin 0.33
+  min_run_blocks: 2
+  gridded_references:
+    - name: imerg_final
+      path: F:/temp/hybrid-bias-correction/data/input/imergf/idn_imergf.nc4
+      variable: precipitation
+      start: "2001-01-01"
+      target_lag: -1      # correctly labelled series match IMERG day D-1 (F19)
+    - name: cpc_uni
+      path: F:/temp/station/cpc/idn_cpc_1979_2025.nc   # subset of user's PSL CPC V1.0 yearly files
+      variable: precip
+      start: "1979-01-01"
+      target_lag: -1      # measured: IMERG-verified BMKG matches CPC at -1 in 2,043/2,089 series-years (F38)
+  # SACA&D originals are NOT stable before 2001 against CPC (F38), so no pairwise reference.
+  pairwise_reference_sources: []
+  overrides:              # [{series_id, start, end, offset}]; start/end are form dates (date_raw)
+    # agro:MOJOSARI: /qc 2026-11-25 (F66, tools/qc_mojosari_lag.py, qc_mojosari_proposal.py), adopted by user 2026-11-25
+    - {series_id: "agro:MOJOSARI:RR", start: "1973-01-01", end: "1976-10-31", offset: 1}   # neighbours_only
+    - {series_id: "agro:MOJOSARI:RR", start: "1976-11-01", end: "1977-05-31", offset: 0}   # neighbours_only
+    - {series_id: "agro:MOJOSARI:RR", start: "1977-06-01", end: "1981-06-08", offset: 1}   # supported
+    - {series_id: "agro:MOJOSARI:RR", start: "1981-06-09", end: "1984-02-29", offset: 2}   # supported
+    - {series_id: "agro:MOJOSARI:RR", start: "1984-03-01", end: "1986-02-28", offset: 1}   # supported
+    - {series_id: "agro:MOJOSARI:RR", start: "1986-03-01", end: "1988-03-31", offset: 0}   # supported
+    - {series_id: "agro:MOJOSARI:RR", start: "1988-04-01", end: "1994-12-31", offset: 1}   # supported
+
+qc:
+  exclusions:                  # tools/build_qc_exclusions.py from the /qc tables (user 2026-10-07)
+    - F:/temp/station/compiled/qc/exclusions_rr.csv
+    - F:/temp/station/compiled/qc/flags_rr_mojosari.csv   # tools/build_qc_flags_mojosari.py (F66, user 2026-11-25); `flag` column: review flags stay in merged views
+    - F:/temp/station/compiled/qc/flags_rr_pu_sihka.csv   # copy of qc_pu_sihka/proposed_exclusions_pu_sihka.csv (tools/qc_pu_sihka_proposal.py), adopted by user 2026-11-26 (F76)
+
+merge:
+  priority: [bmkg_xlsx, chind, fklim_sumatera, sacad_nonblend, sacad2013_extra, knmi, asean_comp, jatim, pu_sihka, agro, sumbar_daily, bmg_posts, larantuka, sumsel_posts, ghcnd, sacad_blend_synop]
+  extend_after_primary: true
+  exclude_sources:             # kept in observations, left out of the merged view (user 2026-10-07)
+    RR: [ghcnd, sacad_blend_synop]   # GTS-derived, UTC-labelled, incomplete daily totals (F22-F23)   # user 2026-10-06: failed fillers may extend past the primary, flagged
+  netcdf_start: "1950-01-01"
+
+# Deliverables (python -m wxgrid export <config> <job>)
+export:
+  rainfall:
+    variable: RR
+    countries: [ID]
+    start: "1866-01-01"        # first merged RR value in Indonesia (SACA&D); 591,134 site-days at 59 Indonesian sites before 1950 (user 2026-11-25)
+    end: "2025-12-31"          # user 2026-11-25: median sites/day 490 (2022), 34 (2023, PU portal gap), 400 (2024), 365 (2025); 2026 has 2
+    out_dir: F:/temp/station/compiled/export
+    prefix: idn_rr_daily_1866_2025
+    mirror_dir: data              # copy of the draft release, tracked in git (user 2026-11-26)
